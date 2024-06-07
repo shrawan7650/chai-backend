@@ -1,5 +1,4 @@
 import { v2 as cloudinary } from "cloudinary";
-import { response } from "express";
 import fs from "fs";
 
 cloudinary.config({
@@ -19,13 +18,15 @@ const uploadFileOnCloudinary = async (localFilePath) => {
     });
 
     //file has been uplaoded sucessfully
-    console.log(
-      "file on uploaded on cloudinary successfully",
-      uploadResult.url
-    );
-    return response;
+    // console.log(
+    //   "file on uploaded on cloudinary successfully",
+    //   uploadResult.url
+    // );
+    fs.unlinkSync(localFilePath)
+    return uploadResult.url;
   } catch (error) {
-    fs.unlinkSync(localFilePath); // remove the locally saved tempoary file as the uplaod operation got  failed
+    fs.unlinkSync(localFilePath);
+    console.log("cloudinary eroor",error.message) // remove the locally saved tempoary file as the uplaod operation got  failed
   }
 };
 

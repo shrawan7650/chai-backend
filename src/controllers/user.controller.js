@@ -3,6 +3,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadFileOnCloudinary } from "../utils/cloudinary/cloudinary.js";
 
 const registerUser = asyncHandler(async (req, res) => {
+
+  // console.log("req fie",req.files)
   //get user detials from frontend
   const { username, password, email, fullname } = req.body;
 
@@ -16,35 +18,39 @@ const registerUser = asyncHandler(async (req, res) => {
     res.send({ msg: "email already exist", status: 409 });
   }
 
-  //check fro images,check for avatar
-  const avaterrequestImage = req.file?.avatar[0]?.path;
-  console.log("requestImageLocalPath", avaterrequestImage);
-
-  const coverImagePath = req.file?.coverImage[0]?.path;
-  console.log("coverImage", coverImagePath);
+  const avatarLocalPath = req.files?.avatar[0]?.path;
+  const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  // console.log("coverge imageLocalPath",coverImageLocalPath)
+  // let coverImageLocalPath;
+  // if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
+  //     coverImageLocalPath = req.files.coverImage[0].path
+  // }
   
-  if (!avaterrequestImage) {
-    res.send({ msg: "Avatar file is required" });
-  }
+  if (!avatarLocalPath) {
+    res.send({status:400, msg:"Avatar file is required"})
+}
   //upload them to cloudinary,avatar
-  const avatar = await uploadFileOnCloudinary(avaterrequestImage);
-  const coverImageUpload = await uploadFileOnCloudinary(coverImagePath);
+  const avatar = await uploadFileOnCloudinary(avatarLocalPath)
+  const coverImage = await uploadFileOnCloudinary(coverImageLocalPath)
+  // console.log("coverge image",coverImage)
   if (!avatar) {
-    res.send({ msg: " avatar is not define " });
-  }
+    res.send({status:400, msg:"Avatar file is required"})
+}
+  
   //create user object - createentry in db
 
-  const savedUSer = await User.Create({
+  const savedUSer = new User({
     fullname,
-    avatar:avatar.url,
+    avatar:avatar,
     email,
-    coverImage:coverImage?.url||"",
+    coverImage:coverImage||"",
     password,
     username:username.toLowerCase()
   });
+  await savedUSer.save();
   //remove password and refres token field from response
  const createdUser =  await User.findById(savedUSer._id).select("-password -refreshToken");
- console.log("created userData",createdUser);
+//  console.log("created userData",createdUser);``   
  //check for user creation
  if(!createdUser){
   res.send({msg:"something went wrong while registring the user "})
@@ -56,4 +62,7 @@ const registerUser = asyncHandler(async (req, res) => {
     msg:"Account created Sucessfully"
   })
 });
-export { registerUser };
+
+
+
+  export { registerUser };

@@ -10,9 +10,10 @@ router.post("/register", upload.fields([
     name:"avatar",
     maxCount:1
   },{
-    name:"coverimage",
+    name:"coverImage",
     maxCount:1
   }
-]), registerUser)
+]), registerUser);
+
 
 export default router;
