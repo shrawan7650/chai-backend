@@ -53,7 +53,7 @@ userSchema.pre("save", async function (next) {
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });
-userSchema.methods.ischeckPassword = async function (password) {
+userSchema.methods.ischeckPassword = async function (password) { 
   return await bcrypt.compare(password, this.password);
 };
 
@@ -63,7 +63,7 @@ userSchema.methods.generatAccessToken = async function () {
     email: this.email,
   };
   return jwt.sign(payload, process.env.Accesss_TOKEN_SECRET, {
-    expireIn: process.env.Accesss_TOKEN_EXPIRY,
+    expiresIn: "15m", // Example expiration time for access token
   });
 };
 userSchema.methods.generatRefreshToken = async function () {
@@ -71,8 +71,8 @@ userSchema.methods.generatRefreshToken = async function () {
     _id: this._id,
     email: this.email,
   };
-  return jwt.sign(payload, process.env.EFRESH_TOKEN_SECRET, {
-    expireIn: process.env.REFRESH_TOKEN_EXPIRY,
+  return jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET, {
+    expiresIn: "7d", // Example expiration time for refresh token
   });
 };
 export const User = mongoose.model("User", userSchema);
