@@ -3,6 +3,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadFileOnCloudinary } from "../utils/cloudinary/cloudinary.js";
 import cookie from "cookies-parser";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 const generateAccessAndRefreshTokens = async (id) => {
   try {
     const user = await User.findById(id);
@@ -35,8 +36,8 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   const avatarLocalPath = req.files?.avatar[0]?.path;
+  // console.log("avtar imageLocalPath",avatarLocalPath)
   const coverImageLocalPath = req.files?.coverImage[0]?.path;
-  // console.log("coverge imageLocalPath",coverImageLocalPath)
   // let coverImageLocalPath;
   // if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
   //     coverImageLocalPath = req.files.coverImage[0].path
@@ -94,7 +95,7 @@ const loginUser = asyncHandler(async (req, res, next) => {
   }
   //check user exist or note
   const user = await User.findOne({ $or: [{ username }, { email }] });
-  console.log("userCheck", user);
+  // console.log("userCheck", user);
   //check user validation
   if (!user) {
     res.send({ msg: "user doesnot exist", status: 404 });
@@ -206,8 +207,8 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
-  const id = req?.userId;
-  const user = await User.findById(id);
+
+  const user = await User.findById(req?.userId);
   const ischeckPassword = await user.ischeckPassword(oldPassword);
   if (!ischeckPassword) {
     return res.send({ msg: "Invalid old Password" });
@@ -219,10 +220,11 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 });
 
 const getProfilePage = asyncHandler(async (req, res) => {
-  const id = req?.userId;
-  const user = await User.findById(id).select("-password -refreshToken");
+  const user = await User.findById(req?.userId).select(
+    "-password -refreshToken",
+  );
 
-  res.status(200).send({ msg: "password change Successfully", user: user });
+  res.status(200).send({ msg: "user get Successfully", user: user });
 });
 
 const updateAccountDetials = asyncHandler(async (req, res) => {
@@ -241,36 +243,47 @@ const updateAccountDetials = asyncHandler(async (req, res) => {
     { new: true },
   ).select("-password");
 
-  res.send({ msg: "update Successfully", user: user });
+  res.send({ msg: "Profille Update Successfully", user: user });
 });
-
 const updateUserAvatar = asyncHandler(async (req, res) => {
-  const avatarLocalPath = req.file?.path;
-  if (!avatarLocalPath) {
-    res.send({ msg: "Avatar file is missing" });
+  try {
+    const avatarLocalPath = req.file?.path;
+    console.log("id", req.userId);
+    console.log("avatarLocalPath", avatarLocalPath);
+    
+    if (!avatarLocalPath) {
+      return res.status(400).send({ msg: "Avatar file is missing" });
+    }
+
     const avatar = await uploadFileOnCloudinary(avatarLocalPath);
+    console.log("avatar", avatar);
 
     if (!avatar) {
-      res.send({ msg: "Avatar is Required" });
+      return res.status(400).send({ msg: "Error while uploading avatar" });
     }
 
     const user = await User.findByIdAndUpdate(
       req.userId,
-      { $set: { avatar } },
-      { new: true },
+      { $set: { avatar: avatar.url } },
+      { new: true }
     ).select("-password");
 
-    res.send({ msg: "Avatar Update is Successfully", user: user });
+    return res.status(200).send({ msg: "Avatar updated successfully", user: user });
+
+  } catch (error) {
+    return res.status(500).send({ msg: error.message });
   }
 });
+
 const updateUserCoverImage = asyncHandler(async (req, res) => {
   const coverImageLocalPath = req.file?.path;
-  if (!avatarLocalPath) {
+  if (!coverImageLocalPath) {
     res.send({ msg: "coverImage file is missing" });
+  }
     const coverImage = await uploadFileOnCloudinary(coverImageLocalPath);
 
     if (!coverImage) {
-      res.send({ msg: "Avatar is Required" });
+      res.send({ msg: "coverImage is Required" });
     }
 
     const user = await User.findByIdAndUpdate(
@@ -281,6 +294,121 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
     res.send({ msg: "Avatar Update is Successfully", user: user });
   }
+);
+const getUserChanelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username?.trim()) {
+    return res.send({ msg: "username is missing" });
+  }
+
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username.toLowerCase(),
+      },
+    },
+    {
+      $lookup: {
+        from: "Subscription",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "Subscription",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscriptions",
+      },
+    },
+    {
+      $addFields: {
+        subscribersCount: {
+          $size: "$subscribers",
+        },
+        channelSubscribeToCount: {
+          $size: "$subscriptions",
+        },
+        isSubscribed: {
+          $in: [req.user?.id, "$subscribers.subscriber"],
+        },
+      },
+    },
+    {
+      $project: {
+        fullname: 1,
+        username: 1,
+        subscribersCount: 1,
+        channelSubscribeToCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        coverImage: 1,
+        email: 1,
+      },
+    },
+  ]);
+
+  console.log("channel hai bahi:", channel);
+  if (!channel?.length) {
+    return res.send({ msg: "channel does not exist" });
+  }
+  return res
+    .status(200)
+    .json({ channel: channel[0], msg: "User channel fetched successfully" });
+});
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+  console.log("user ka id hai:", req.userId);
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.userId),
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "watchHistory",
+        foreignField: "_id",
+        as: "watchHistory",
+        pipeline: [
+          {
+            $lookup: {
+              from: "users",
+              localField: "owner",
+              foreignField: "_id",
+              as: "owner",
+              pipeline: [
+                {
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+console.log("user detials hai bhai",user)
+
+  return res.status(200).json({
+    user: user[0].watchHistory,
+    msg: "Watch history fetched successfully",
+  });
 });
 
 export {
@@ -292,5 +420,7 @@ export {
   getProfilePage,
   updateAccountDetials,
   updateUserAvatar,
-  updateUserCoverImage
+  updateUserCoverImage,
+  getUserChanelProfile,
+  getWatchHistory,
 };
