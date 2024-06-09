@@ -160,7 +160,6 @@ const logoutUser = asyncHandler(async (req, res) => {
   }
 });
 
-
 const refreshAccessToken = asyncHandler(async (req, res) => {
   try {
     const incomingRefreshToken =
@@ -204,4 +203,94 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     res.send({ msg: error.message });
   }
 });
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const id = req?.userId;
+  const user = await User.findById(id);
+  const ischeckPassword = await user.ischeckPassword(oldPassword);
+  if (!ischeckPassword) {
+    return res.send({ msg: "Invalid old Password" });
+  }
+  user.password = newPassword;
+  await user.save({ validateBeforSave: false });
+
+  res.status(200).send({ msg: "password change Successfully" });
+});
+
+const getProfilePage = asyncHandler(async (req, res) => {
+  const id = req?.userId;
+  const user = await User.findById(id).select("-password -refreshToken");
+
+  res.status(200).send({ msg: "password change Successfully", user: user });
+});
+
+const updateAccountDetials = asyncHandler(async (req, res) => {
+  const { fullname, email } = req.body;
+  if (!fullname || !email) {
+    return res.send({ msg: "All Fields are Required" });
+  }
+  const user = await User.findByIdAndUpdate(
+    req?.userId,
+    {
+      $set: {
+        fullname,
+        email,
+      },
+    },
+    { new: true },
+  ).select("-password");
+
+  res.send({ msg: "update Successfully", user: user });
+});
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    res.send({ msg: "Avatar file is missing" });
+    const avatar = await uploadFileOnCloudinary(avatarLocalPath);
+
+    if (!avatar) {
+      res.send({ msg: "Avatar is Required" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { $set: { avatar } },
+      { new: true },
+    ).select("-password");
+
+    res.send({ msg: "Avatar Update is Successfully", user: user });
+  }
+});
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  const coverImageLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    res.send({ msg: "coverImage file is missing" });
+    const coverImage = await uploadFileOnCloudinary(coverImageLocalPath);
+
+    if (!coverImage) {
+      res.send({ msg: "Avatar is Required" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { $set: { coverImage } },
+      { new: true },
+    ).select("-password");
+
+    res.send({ msg: "Avatar Update is Successfully", user: user });
+  }
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+  getProfilePage,
+  updateAccountDetials,
+  updateUserAvatar,
+  updateUserCoverImage
+};

@@ -14,7 +14,7 @@ export const verifyToken = asyncHandler(async (req, res, next) => {
     const decodedToken = jwt.verify(token, process.env.Accesss_TOKEN_SECRET);
     console.log("decodedToken", decodedToken);
 
-    req.userId = decodedToken;
+    req.userId = decodedToken._id;
     next();
   } catch (error) {
     res.status(401).send({ msg: error.message || "invalid access token" });
